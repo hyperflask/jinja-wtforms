@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        {% form Signup %}
+        <form action="/" method="POST">
+            {{ form.hidden_tag() }}
+            <p><label>First name</label> {{ form.firstname.text() }}</p>
+            <p><label>Last name</label> {{ form.lastname.text() }}</p>
+            <p><label>Email</label> {{ form.email.email(required=True) }}</p>
+            <p><label>Password</label> {{ form.password.password(required=True) }}</p>
+            <button type="submit">Signup</button>
+        </form>
+        <hr>
+        {% form Fail(csrf=False) = fail %}
+        <form action="/" method="POST">
+            <p><label>First name</label> {{ fail.firstname.text() }}</p>
+            <button type="submit">Signup</button>
+        </form>
+    </body>
+</html>
