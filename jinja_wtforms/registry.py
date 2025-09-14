@@ -1,17 +1,22 @@
 from wtforms import Form
 from .extractor import extract_form_classes_from_template, FormStmtExtension
-import os
+from jinja2 import TemplateNotFound, TemplateSyntaxError
 
 
 class TemplateForms:
     def __init__(self, form_classes):
         self.form_classes = form_classes
 
-    def __getattr__(self, name):
+    def get(self, name):
         for form_class in self.form_classes:
-            if form_class.template_var_name == name:
+            if form_class.template_var_name == name or form_class.__name__ == name:
                 return form_class
-        raise AttributeError()
+
+    def __getattr__(self, name):
+        form_class = self.get(name)
+        if form_class is None:
+            raise AttributeError()
+        return form_class
     
     def __call__(self, *args, **kwargs):
         if len(self.form_classes) == 1:
@@ -33,7 +38,11 @@ class FormRegistry:
             self.register(template, template[len(remove_prefix):].lstrip("/") if remove_prefix else template, **extract_kwargs)
 
     def register(self, template, alias=None, **extract_kwargs):
-        form_classes = extract_form_classes_from_template(self.env, template, **dict({"base_cls": getattr(self.env, "form_base_cls", Form)}, **extract_kwargs))
+        try:
+            form_classes = extract_form_classes_from_template(self.env, template, **dict({"base_cls": getattr(self.env, "form_base_cls", Form)}, **extract_kwargs))
+        except TemplateSyntaxError:
+            return
+        
         self.forms[alias or template] = TemplateForms(form_classes)
         for form_class in form_classes:
             if form_class.__name__ != "TemplateForm":
@@ -43,6 +52,12 @@ class FormRegistry:
         if path not in self.forms:
             self.register(path)
         return self.forms[path]
+    
+    def get(self, path):
+        try:
+            return self[path]
+        except TemplateNotFound:
+            return None
     
 
 class WtformExtension(FormStmtExtension):

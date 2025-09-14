@@ -21,10 +21,9 @@ def extract_form_classes_from_node(node, class_name=None, var_name="form", base_
         form_defs = {var_name: {"class_name": class_name, "meta": {}}}
 
     for form_node in node.find_all((nodes.Const)):
-        if not hasattr(form_node, "form_class_name"):
+        if not hasattr(form_node, "form_var_name"):
             continue
-        var_name = getattr(form_node, "form_var_name", var_name[0] if isinstance(var_name, (list, tuple)) else var_name)
-        form_defs[var_name] = {"class_name": form_node.form_class_name, "meta": getattr(form_node, "form_meta", {})}
+        form_defs[form_node.form_var_name] = {"class_name": form_node.form_class_name, "meta": form_node.form_meta}
 
     forms = {}
     for call in node.find_all((nodes.Call,)):
@@ -83,15 +82,40 @@ class FormStmtExtension(Extension):
     tags = set(["form"])
 
     def parse(self, parser):
-        node = nodes.Const("")
-        parser.stream.expect("name")
-        node.form_class_name = parser.stream.current.value
-        next(parser.stream)
+        lineno = next(parser.stream).lineno
+        form_var_name = "form"
+        form_meta = {}
+        if parser.stream.current.test("name"):
+            form_class_name = next(parser.stream).value
         if parser.stream.current.test("lparen"):
-            node.form_meta = {k.key: jinja_node_to_python(k.value) for k in parser.parse_call_args()[1]}
+            form_meta = {k.key: jinja_node_to_python(k.value) for k in parser.parse_call_args()[1]}
         if parser.stream.skip_if("assign"):
-            node.form_var_name = parser.stream.expect("name").value
-        return node
+            form_var_name = parser.stream.expect("name").value
+        
+        auto_init = form_meta.pop("auto_init", True)
+        node = nodes.Const("", lineno=lineno)
+        node.form_class_name = form_class_name
+        node.form_meta = form_meta
+        node.form_var_name = form_var_name
+        out = [node]
+
+        if auto_init:
+            out.append(
+                nodes.If(nodes.Not(nodes.Test(nodes.Name(form_var_name, "load"), "defined", [], [], None, None)), [
+                    nodes.Assign(nodes.Name(form_var_name, "store"), self.call_method("_init_form_obj", [nodes.ContextReference(), nodes.Const(form_var_name)], lineno=lineno))
+                ], [], [], lineno=lineno)
+            )
+
+        return out
+    
+    def _init_form_obj(self, context, var_name):
+        if not context.name:
+            return
+        forms = self.environment.forms.get(context.name)
+        if not forms:
+            return
+        form_class = forms.get(var_name)
+        return form_class() if form_class else None
     
 
 JINJA_CALL_NODE_CONVERTERS = {}

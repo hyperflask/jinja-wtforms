@@ -12,7 +12,6 @@ app.config['SECRET_KEY'] = 'secret'
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form = app.jinja_env.forms['index.html'].form()
-    fail = app.jinja_env.forms['index.html'].fail()
     if form.validate_on_submit():
         return render_template('success.html', data=form.data)
-    return render_template('index.html', form=form, fail=fail)
+    return render_template('index.html', form=form)
