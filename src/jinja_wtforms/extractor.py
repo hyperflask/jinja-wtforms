@@ -85,6 +85,7 @@ class FormStmtExtension(Extension):
         lineno = next(parser.stream).lineno
         form_var_name = "form"
         form_meta = {}
+        form_class_name = None
         if parser.stream.current.test("name"):
             form_class_name = next(parser.stream).value
         if parser.stream.current.test("lparen"):
@@ -97,7 +98,7 @@ class FormStmtExtension(Extension):
         node.form_class_name = form_class_name
         node.form_meta = form_meta
         node.form_var_name = form_var_name
-        out = [node]
+        out = [nodes.Output([node])]
 
         if auto_init:
             out.append(
